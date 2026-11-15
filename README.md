@@ -37,11 +37,15 @@ database setup, cron configuration, and serverless limits.
 
 The short version:
 
-1. Point `DATABASE_URL` at a managed Postgres database.
+1. Point `DATABASE_URL` at the pooled managed Postgres URL and `DIRECT_URL` at
+   the direct URL used by migrations.
 2. Add the values from `.env.example` to Vercel Project Settings.
-3. Set `CRON_SECRET`; `vercel.json` schedules `/api/cron/dispatch`.
-4. Run `npm run db:deploy` (or `npx prisma db push` for a fresh database).
-5. Deploy.
+3. Set `CRON_SECRET`. On Pro, Vercel Cron can call `/api/cron/dispatch` every
+   minute. On Hobby, the included GitHub Actions workflow calls it every 5
+   minutes.
+4. Run `npm run db:deploy` (or `npx prisma db push` for a fresh database), then
+   `npm run db:seed` to create the admin user.
+5. Deploy. The live production URL is <https://evm-sentinel.vercel.app>.
 
 For the Cloudflare Email Service (no SMTP), see
 [`docs/cloudflare-email.md`](docs/cloudflare-email.md).

@@ -6,10 +6,11 @@ does not need SMTP).
 
 ## What changed for serverless
 
-- Campaign sending is driven by `GET /api/cron/dispatch`, scheduled in
-  `vercel.json`. The old in-process `setInterval` dispatcher is still used on a
-  normal long-running host (local dev, Docker, VPS), but it is disabled when
-  `VERCEL` is set.
+- Campaign sending is driven by `GET /api/cron/dispatch`. On Pro it is
+  scheduled by Vercel Cron; on Hobby it is called by the included GitHub
+  Actions workflow. The old in-process `setInterval` dispatcher is still used
+  on a normal long-running host (local dev, Docker, VPS), but it is disabled
+  when `VERCEL` is set.
 - `lib/job-lock.ts` takes a Postgres lease so overlapping cron invocations do
   not double-send.
 - Contact files are parsed in the browser and inserted in small JSON batches.
@@ -21,29 +22,37 @@ does not need SMTP).
 Vercel cannot reach `127.0.0.1:5433`. Use Neon, Supabase, Vercel Postgres, or
 another managed Postgres.
 
-Use the provider's **pooled** connection string for `DATABASE_URL`. For the
-initial schema, run the migration from your machine against the **direct**
-connection string:
+Use the provider's **pooled** connection string for `DATABASE_URL` and its
+**direct** connection string for `DIRECT_URL`. Prisma Client uses the pooled
+URL at runtime; `prisma migrate deploy` uses the direct URL.
 
 ```bash
-DATABASE_URL="<direct connection string>" npm run db:deploy
+DATABASE_URL="<pooled connection string>" \
+DIRECT_URL="<direct connection string>" \
+npm run db:deploy
 ```
 
-If this is a fresh database and you have not generated migrations yet, run:
+If this is a fresh database and you have not generated migrations yet, use
+`npx prisma db push` instead. For production, prefer migrations so schema
+changes are repeatable.
+
+Create the admin login (safe to re-run; it updates the password):
 
 ```bash
-npx prisma db push
+DATABASE_URL="<pooled connection string>" \
+DIRECT_URL="<direct connection string>" \
+ADMIN_EMAIL="admin@example.com" \
+ADMIN_PASSWORD="<strong password>" \
+npm run db:seed
 ```
-
-For production, prefer migrations (`prisma migrate deploy`) so schema changes
-are repeatable.
 
 ## 2. Configure environment variables
 
 Copy `.env.example` and fill in the values in Vercel Project Settings. At
 minimum:
 
-- `DATABASE_URL`
+- `DATABASE_URL` (pooled)
+- `DIRECT_URL` (direct, for migrations)
 - `SESSION_SECRET`
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD`
 - `APP_BASE_URL` and `UNSUBSCRIBE_BASE_URL` (public HTTPS origin)
