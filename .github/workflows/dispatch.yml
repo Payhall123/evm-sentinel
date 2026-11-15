@@ -1,0 +1,30 @@
+name: Campaign dispatch
+
+# Vercel Hobby only allows daily cron jobs. This workflow provides a free
+# 5-minute trigger while the project is on Hobby. On Pro, remove this workflow
+# and restore the every-minute cron entry in vercel.json.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: campaign-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger dispatcher
+        env:
+          CRON_URL: ${{ secrets.CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "CRON_URL and CRON_SECRET repository secrets are required." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$CRON_URL/api/cron/dispatch"

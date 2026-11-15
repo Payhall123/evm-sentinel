@@ -1,0 +1,12 @@
+# Never upload local secrets or large archives to a Vercel build.
+.env
+.env.*
+!.env.example
+.vercel
+.next
+node_modules
+.imports
+legacy
+evms-smoke.log
+send.txt
+scripts/tmp-*

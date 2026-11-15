@@ -55,7 +55,12 @@ For Cloudflare email, add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
 
 ## 3. Cron
 
-`vercel.json` schedules `/api/cron/dispatch` every minute:
+The dispatcher is exposed at `/api/cron/dispatch` and authenticates with
+`Authorization: Bearer $CRON_SECRET`.
+
+### Vercel Pro (recommended)
+
+Add this to `vercel.json` and remove `.github/workflows/dispatch.yml`:
 
 ```json
 {
@@ -63,12 +68,19 @@ For Cloudflare email, add `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
 }
 ```
 
-Minute-level cron requires a Vercel plan that supports it (Pro). On Hobby,
-change the schedule to a frequency the plan allows; campaign delivery will be
-correspondingly slower.
+### Vercel Hobby
 
-Vercel sends `Authorization: Bearer $CRON_SECRET`. The route also accepts
-`?secret=...` for a manual test:
+Hobby accounts only allow daily Vercel cron jobs. This repository includes
+`.github/workflows/dispatch.yml`, which calls the endpoint every 5 minutes
+using GitHub Actions. In the GitHub repo, add these Actions secrets:
+
+- `CRON_URL` — e.g. `https://your-app.vercel.app`
+- `CRON_SECRET` — the same value configured in Vercel
+
+GitHub's scheduler can be delayed, so a new campaign may take a few minutes to
+start sending. That is acceptable for low-volume use but not for strict SLAs.
+
+### Manual test
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" \
