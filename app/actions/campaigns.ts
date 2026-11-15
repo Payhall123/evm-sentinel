@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { prisma } from "@/lib/db";
 import type { Sender } from "@prisma/client";
 import { requireUser } from "@/lib/auth";
 import { campaignSchema } from "@/lib/validation";
 import { ensureDispatcherRunning } from "@/lib/dispatcher";
+import { kickDispatcher } from "@/lib/dispatch-kick";
 
 export async function createCampaignAction(formData: FormData, isDevnerMode: boolean = false): Promise<{ error?: string }> {
   const { accessKey } = await requireUser();
@@ -105,7 +107,15 @@ export async function createCampaignAction(formData: FormData, isDevnerMode: boo
     { timeout: 300_000, maxWait: 30_000 },
   );
 
-  ensureDispatcherRunning();
+  // Start sending immediately instead of waiting for the scheduler. On Vercel
+  // there is no process to hold the local interval, so the tick is queued to
+  // run after this action's redirect has been sent; locally the interval is
+  // started as before.
+  if (process.env.VERCEL) {
+    after(() => kickDispatcher({ timeBudgetMs: 20_000, minIntervalMs: 0 }));
+  } else {
+    ensureDispatcherRunning();
+  }
   revalidatePath("/dashboard/campaigns");
   redirect(`/dashboard/campaigns/${campaign.id}`);
 }

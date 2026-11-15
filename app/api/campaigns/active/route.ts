@@ -1,9 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { ensureDispatcherRunning } from "@/lib/dispatcher";
+import { kickDispatcher } from "@/lib/dispatch-kick";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+// The response is sent first, then the background tick keeps sending for up to
+// Vercel's function limit. Leftover messages stay queued for the next tick.
+export const maxDuration = 60;
 
 // Feeds the live send toast. Returns the most recent campaign for the signed-in
 // access key (active or most recently finished) so the client can show a live
@@ -24,8 +29,6 @@ export async function GET() {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    ensureDispatcherRunning();
-
     const campaign = await prisma.campaign.findFirst({
       where: { accessKeyId: accessKey.id },
       orderBy: { createdAt: "desc" },
@@ -38,6 +41,17 @@ export async function GET() {
         failedCount: true,
       },
     });
+
+    if (campaign && (campaign.status === "queued" || campaign.status === "sending")) {
+      // Serverless has no long-lived worker, so the open dashboard is what
+      // drives the queue: after the poll response is flushed, push the next
+      // batch. Locally the in-process interval already does this.
+      if (process.env.VERCEL) {
+        after(() => kickDispatcher({ timeBudgetMs: 45_000 }));
+      } else {
+        ensureDispatcherRunning();
+      }
+    }
 
     return NextResponse.json({ campaign });
   } catch (error) {
