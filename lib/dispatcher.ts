@@ -453,12 +453,17 @@ async function dispatchCampaign(
     // which case the message goes out without the header rather than with a
     // link that 404s.
     const unsubscribeUrl = buildUnsubscribeUrl(accessKey.id, m.contactId);
-    const unsubscribeHeaders = unsubscribeUrl
-      ? {
-          "List-Unsubscribe": `<${unsubscribeUrl}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        }
-      : undefined;
+    // Bird (and other strict providers) reject the whole send when the
+    // List-Unsubscribe URL is not a valid HTTPS one-click URL, so only emit
+    // the header when it is actually HTTPS. An HTTP/unconfigured URL degrades
+    // to sending without the header instead of failing the message.
+    const unsubscribeHeaders =
+      unsubscribeUrl && /^https:\/\//i.test(unsubscribeUrl)
+        ? {
+            "List-Unsubscribe": `<${unsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          }
+        : undefined;
     try {
       const params = {
         to: [m.email],
