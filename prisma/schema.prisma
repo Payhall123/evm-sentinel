@@ -1,0 +1,334 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Vercel/Neon use a pooled URL for queries and a direct URL for migrations.
+  // On a long-running host both values can point at the same database.
+  directUrl = env("DIRECT_URL")
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model AccessKey {
+  id              String       @id @default(cuid())
+  key             String       @unique
+  name            String
+  email           String?      // optional identity bound to this key (for login matching)
+  domain          String
+  status          String       @default("provisioning") // provisioning | dns_pending | active | revoked
+  dailyLimit      Int?                            // optional max messages per key per UTC day
+  expiresAt       DateTime?                       // optional key expiry; sends blocked after this moment
+  postalOrg       String?
+  postalServer    String?
+  postalDomainId  String?
+  postalApiKey    String?
+  dkimName        String?
+  dnsRecords      Json?        // { spf, dkim, mx: string, dkimName }
+  // Upstream mail transport for this key. "postal" = self-hosted Postal (domain +
+  // API credential, the original flow). "devner" = relay through the Devner API
+  // (Gmail-backed) using the Devner key below / DEVNER_API_KEY. "ses" = the
+  // customer's Amazon SES account. "elasticemail" / "resend" / "mailgun" = the
+  // customer's own account with that provider, using the API key stored below.
+  // "smtp" / "custom" = generic SMTP provider (e.g. Spacemail).
+  // "zeptomail" = ZeptoMail (now Zoho CPaaS) SMTP relay (smtp.zeptomail.com).
+  provider        String       @default("postal")
+  // Optional per-key Devner API key (sl_...). Falls back to the DEVNER_API_KEY
+  // environment variable so one shared Devner account can back many keys.
+  devnerApiKey    String?
+  // Per-key Elastic Email API key (X-ElasticEmail-ApiKey). Elastic Email is
+  // configured per access key so each user sends through their own account.
+  elasticEmailApiKey String?
+  // Per-key Resend API key (re_...). Sent as the Authorization: Bearer token on
+  // every Resend API request; the key's sending domain must be verified in that
+  // same Resend account.
+  resendApiKey    String?
+  // Per-key Mailgun API key. Mailgun authenticates with HTTP Basic auth
+  // ("api" + key) and sends through /v3/<domain>/messages. The access key's
+  // `domain` is the Mailgun sending domain (a sandbox domain is valid), and
+  // `mailgunApiBase` optionally selects the EU or a dedicated API endpoint.
+  mailgunApiKey   String?
+  mailgunApiBase  String?
+  // Cloudflare Email Service (provider = "cloudflare"). Outbound mail is sent
+  // through Cloudflare's REST API (POST /accounts/<id>/email/sending/send) with
+  // the account id + API token below, so no SMTP server is involved. The same
+  // credentials can optionally create an Email Routing rule that receives mail
+  // for `inboxAddress` and forwards it to `inboundForwardTo` — again without an
+  // SMTP mailbox on our side. `emailRoutingRecords` caches the MX/SPF/DKIM
+  // records Cloudflare reports so the admin page can show them.
+  cloudflareAccountId   String?
+  cloudflareApiToken    String?
+  cloudflareZoneId      String?
+  inboxAddress          String?
+  inboundForwardTo      String?
+  cloudflareRuleId      String?
+  emailRoutingStatus    String?   // pending | pending_verification | active | manual | error
+  emailRoutingRecords   Json?     // [{ type, name, content, priority, ttl }]
+  emailRoutingNote      String?   // e.g. "verification email sent"
+  emailRoutingError     String?
+  emailRoutingCheckedAt DateTime?
+  // Per-key secret used in the Mailgun delivery-event webhook URL. It is created
+  // with the access key, then the dispatcher registers the URL with the Mailgun
+  // domain before the first send. `mailgunWebhookAt` records a successful
+  // registration so the checks are not repeated for every campaign.
+  mailgunWebhookSecret String?   @unique
+  mailgunWebhookAt     DateTime?
+  // Amazon SES transport credentials (provider = "ses"). The API path signs SES
+  // v2 SendEmail requests with the IAM access key/secret. The SMTP path uses the
+  // SES SMTP endpoint; its password can be supplied at creation time or derived
+  // from the secret access key (AWS' documented conversion).
+  sesRegion           String?
+  sesAccessKeyId      String?
+  sesSecretAccessKey  String?
+  sesSmtpUsername     String?
+  sesSmtpPassword     String?
+  sesSmtpPort         Int?
+  // Optional SES configuration set for open/click/bounce event publishing.
+  sesConfigurationSet String?
+  // Which resource this key uses. "api" = Postal HTTP API credential (default, current
+  // flow). "smtp" = an attached Postal SMTP mailbox credential only. "both" = both.
+  // For SES: "api" = SES v2 API, "smtp" = SES SMTP endpoint, "both" = API sends
+  // plus SMTP credentials exposed to the customer.
+  sendMode        String       @default("api")
+  // Attached Postal SMTP mailbox credential (type=SMTP). The password is the
+  // credential "key" scraped from Postal at attach/create time.
+  smtpOrg         String?
+  smtpServer      String?
+  smtpCredentialId String?     // Postal credential uuid
+  smtpMailbox     String?      // friendly mailbox label (credential name)
+  smtpUsername    String?      // address presented by the client (Postal ignores it)
+  smtpPassword    String?      // credential key (secret)
+  smtpHost        String?      // e.g. mail.diveru.ink
+  smtpPort        Int?         // e.g. 587
+  // Multiple custom SMTP providers (e.g. several Spacemail accounts). The
+  // dispatcher rotates across them so no single SMTP server carries the whole
+  // campaign. The first endpoint is also mirrored onto smtpHost/smtpPort/
+  // smtpUsername/smtpPassword for the dashboard and legacy lookups.
+  smtpEndpoints   SmtpEndpoint[]
+  // Delivery analytics: the shared secret we embed in the Postal webhook URL
+  // (?k=...) and the id we recorded when we registered it. A null secret means
+  // the webhook has not been registered for this key's mail server yet.
+  postalWebhookSecret String?
+  postalWebhookId     String?
+  postalWebhookAt     DateTime?
+  createdAt       DateTime     @default(now())
+  revokedAt       DateTime?
+  letters         Letter[]
+  lists           ContactList[]
+  senders         Sender[]
+  campaigns       Campaign[]
+  suppressions    Suppression[]
+  importJobs      ImportJob[]
+}
+
+// One SMTP server attached to an access key (provider = "smtp"/"custom"). A
+// key can hold several of these; the dispatcher round-robins across the active
+// ones so sends spread over all of the customer's SMTP accounts instead of a
+// single server taking every message. Consecutive failures trip the endpoint
+// into a cooldown (disabledAt) and the rotation skips it while it is hot —
+// spread the load, not the failures.
+model SmtpEndpoint {
+  id          String    @id @default(cuid())
+  accessKeyId String
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  label       String?   // optional friendly name, e.g. "Spacemail #1"
+  host        String
+  port        Int       @default(587)
+  username    String
+  password    String
+  active      Boolean   @default(true) // admin can pause an endpoint without deleting it
+  failCount   Int       @default(0)    // consecutive failed sends recorded by the dispatcher
+  disabledAt  DateTime? // circuit-breaker open time; skipped until it cools down
+  createdAt   DateTime  @default(now())
+
+  @@index([accessKeyId])
+}
+
+model Sender {
+  id          String     @id @default(cuid())
+  accessKeyId String
+  accessKey   AccessKey  @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  email       String
+  name        String?
+  replyTo     String?
+  createdAt   DateTime   @default(now())
+  campaigns   Campaign[]
+
+  @@unique([accessKeyId, email])
+}
+
+model Letter {
+  id           String    @id @default(cuid())
+  accessKeyId  String
+  accessKey    AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  name         String
+  subject      String
+  htmlBody     String
+  plainText    String?
+  createdAt    DateTime  @default(now())
+  campaigns    Campaign[]
+}
+
+model ContactList {
+  id           String     @id @default(cuid())
+  accessKeyId  String
+  accessKey    AccessKey  @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime   @default(now())
+  contacts     Contact[]
+  campaigns    Campaign[]
+  importJobs   ImportJob[]
+}
+
+model Contact {
+  id         String      @id @default(cuid())
+  listId     String
+  list       ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  email      String
+  firstName  String?
+  lastName   String?
+  createdAt  DateTime    @default(now())
+  // Set when this address opts out via the RFC 8058 List-Unsubscribe link.
+  unsubscribedAt DateTime?
+  messages   Message[]
+
+  @@index([listId])
+}
+
+// Addresses that must never receive another campaign for a given key. Written on
+// unsubscribe and read by the dispatcher before every send, so an opt-out holds
+// even after the contact row is deleted or re-imported.
+model Suppression {
+  id          String    @id @default(cuid())
+  accessKeyId String
+  accessKey   AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  email       String
+  reason      String    @default("unsubscribed")
+  createdAt   DateTime  @default(now())
+
+  @@unique([accessKeyId, email])
+  @@index([accessKeyId])
+}
+
+model Campaign {
+  id           String    @id @default(cuid())
+  accessKeyId  String
+  accessKey    AccessKey @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  letterId     String
+  letter       Letter    @relation(fields: [letterId], references: [id], onDelete: Cascade)
+  listId       String
+  list         ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  senderId     String?
+  sender       Sender?   @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  fromEmail    String
+  fromName     String?
+  replyTo      String?
+  subject      String
+  status       String    @default("queued") // queued | sending | sent | partial | failed
+  totalCount   Int       @default(0)
+  sentCount    Int       @default(0)
+  failedCount  Int       @default(0)
+  error        String?
+  createdAt    DateTime  @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  messages     Message[]
+}
+
+model Message {
+  id           String    @id @default(cuid())
+  campaignId   String
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId    String
+  contact      Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  email        String
+  fromEmail    String
+  status       String    @default("queued") // queued | sent | failed | skipped
+  // `status` above is the app's own view ("did we hand it to the transport?").
+  // The fields below are the transport's own view of what happened to the
+  // message after we handed it over (delivered / soft-fail / hard-fail /
+  // bounce / held), fed back by provider webhooks. They are independent of
+  // `status` so a message stays "sent" (accepted) while its delivery outcome
+  // is still pending, and they are populated for every send mode that reports
+  // outcomes (currently Postal, both API and SMTP).
+  provider     String?   // postal-api | postal-smtp | devner | ses-api | ses-smtp | elasticemail | resend | mailgun | smtp | zeptomail
+  // Normalised identifier used to match provider callbacks back to this row.
+  // Postal SMTP sends carry the Message-ID (brackets stripped); Postal API
+  // sends carry the message token; Devner carries its own message id.
+  correlationId String?
+  deliveryStatus   String?   // sent | soft_fail | hard_fail | bounced | held
+  deliveryDetail   String?   // provider-supplied human detail
+  deliveryOutput   String?   // provider SMTP transcript / response
+  deliveryUpdatedAt DateTime? // when the newest provider event arrived
+  postalId     String?
+  error        String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  events       DeliveryEvent[]
+
+  @@index([campaignId, status])
+  @@index([correlationId])
+  @@index([campaignId, deliveryStatus])
+}
+
+// One provider-reported delivery event for a message. Kept as a timeline so the
+// per-recipient detail can show every outcome a message went through (e.g. a
+// soft-fail that later succeeded) rather than only the latest one.
+model DeliveryEvent {
+  id           String   @id @default(cuid())
+  messageId    String
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  event        String   // raw provider event, e.g. MessageSent / MessageDelayed
+  status       String   // raw provider status, e.g. Sent / SoftFail / HardFail / Held / Bounced
+  deliveryStatus String // normalised bucket (sent | soft_fail | hard_fail | bounced | held)
+  detail       String?
+  output       String?
+  providerAt   DateTime? // provider's own event timestamp
+  createdAt    DateTime @default(now())
+
+  @@index([messageId])
+}
+
+// A batched contact import. Large uploads (50k+ contacts) are accepted instantly
+// — the uploaded files are persisted and a background worker parses them and
+// inserts contacts in small chunks. This keeps a single request from tripping
+// the server-action body limit or Postgres' per-statement parameter limit, and
+// lets the UI show live progress while the list fills up.
+// Cross-instance lock for scheduled jobs. Vercel may invoke the same cron route
+// concurrently (or retry it), so the dispatcher claims this row before sending.
+// `owner` prevents a slow, expired run from releasing a newer run's lock.
+model JobLock {
+  name        String    @id
+  owner       String?
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+model ImportJob {
+  id             String      @id @default(cuid())
+  accessKeyId    String
+  accessKey      AccessKey   @relation(fields: [accessKeyId], references: [id], onDelete: Cascade)
+  listId         String
+  list           ContactList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  status         String      @default("pending") // pending | processing | done | failed
+  files          Json // [{ path, name, format: "csv" | "txt" }]
+  fileCount      Int         @default(0)
+  totalBytes     Int         @default(0)
+  totalCount     Int         @default(0) // unique valid contacts parsed (known once parsing finishes)
+  processedCount Int         @default(0) // contacts inserted so far
+  skippedCount   Int         @default(0)
+  error          String?
+  createdAt      DateTime    @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+
+  @@index([accessKeyId])
+  @@index([status])
+}
