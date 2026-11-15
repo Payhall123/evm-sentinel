@@ -28,6 +28,7 @@ const PROVIDERS = [
   { value: "resend", title: "Resend", body: "Send through the customer's own Resend account via its HTTP API." },
   { value: "cloudflare", title: "Cloudflare Email Service", body: "Send through Cloudflare's REST API (no SMTP) and optionally receive mail with Email Routing." },
   { value: "mailgun", title: "Mailgun", body: "Send through the customer's own Mailgun account and sending domain via its HTTP API." },
+  { value: "bird", title: "Bird (MessageBird)", body: "Send through the customer's own Bird workspace via the Bird Email API." },
   { value: "zeptomail", title: "ZeptoMail (Zoho CPaaS)", body: "Send through Zoho CPaaS / ZeptoMail SMTP using a Mail Agent's SMTP credentials." },
   { value: "smtp", title: "Custom SMTP", body: "Send through any SMTP provider (e.g., Spacemail)." },
 ];
@@ -76,16 +77,17 @@ export function NewAccessKeyForm() {
   const isResend = provider === "resend";
   const isCloudflare = provider === "cloudflare";
   const isMailgun = provider === "mailgun";
+  const isBird = provider === "bird";
   const isZeptomail = provider === "zeptomail";
   const isCustomSmtp = provider === "smtp" || provider === "custom";
   const isSmtpProvider = isCustomSmtp || isZeptomail;
-  const isApiOnly = isDevner || isElasticEmail || isResend || isCloudflare || isMailgun;
+  const isApiOnly = isDevner || isElasticEmail || isResend || isCloudflare || isMailgun || isBird;
   const wantsApi = !isApiOnly && !isSmtpProvider && sendMode !== "smtp";
   const wantsSmtp = !isApiOnly && !isSmtpProvider && sendMode !== "api";
   // SES, Elastic Email, Resend, Mailgun, ZeptoMail and custom SMTP always need a
   // verified domain for the from-address, even in SMTP mode (unlike Postal,
   // where SMTP-only keys inherit the mailbox domain).
-  const domainRequired = isDevner || isSes || isElasticEmail || isResend || isCloudflare || isMailgun || isSmtpProvider || wantsApi;
+  const domainRequired = isDevner || isSes || isElasticEmail || isResend || isCloudflare || isMailgun || isBird || isSmtpProvider || wantsApi;
   const modes = isSes ? SES_MODES : MODES;
 
   useEffect(() => {
@@ -250,6 +252,36 @@ export function NewAccessKeyForm() {
             <p className="text-xs text-zinc-500">
               The sending domain must already be verified in that Resend account (DKIM + SPF records added at the
               DNS provider) or sends are rejected.
+            </p>
+          </div>
+        )}
+
+        {isBird && (
+          <div className="space-y-4 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
+            <div>
+              <p className="text-sm font-medium text-zinc-300">Bird (MessageBird) API</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Add the API key for this user&apos;s Bird workspace. It is stored on the access key and used via the{" "}
+                <code className="text-cyan-300">@messagebird/sdk</code> client. The region is inferred from the key
+                prefix (<code className="text-cyan-300">bk_us1_…</code> / <code className="text-cyan-300">bk_eu1_…</code>).
+              </p>
+            </div>
+            <div>
+              <Label>Bird API key</Label>
+              <Input
+                name="birdApiKey"
+                type="password"
+                required
+                placeholder="bk_us1_…"
+                autoComplete="new-password"
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                Create the key in Bird under Developers → API keys. Each access key can use a different Bird workspace.
+              </p>
+            </div>
+            <p className="text-xs text-zinc-500">
+              The sending domain must already be verified in that Bird workspace (SPF + DKIM). Sends use Bird&apos;s
+              shared onboarding sender until a domain is verified.
             </p>
           </div>
         )}
@@ -801,6 +833,8 @@ export function NewAccessKeyForm() {
                       : "Adding Cloudflare sending…"
                     : isMailgun
                       ? "Adding Mailgun key…"
+                    : isBird
+                      ? "Adding Bird key…"
                     : isZeptomail
                       ? "Adding ZeptoMail SMTP…"
                       : isCustomSmtp
@@ -818,6 +852,8 @@ export function NewAccessKeyForm() {
                       : "Create Cloudflare access key"
                     : isMailgun
                       ? "Create Mailgun access key"
+                    : isBird
+                      ? "Create Bird access key"
                     : isZeptomail
                       ? "Create ZeptoMail access key"
                       : isCustomSmtp
@@ -956,6 +992,13 @@ export function NewAccessKeyForm() {
               The user&apos;s Mailgun API key is attached. They can send from any address on the Mailgun sending
               domain; sandbox domains only deliver to authorised recipients. Delivery events are registered with
               Mailgun automatically on the first campaign.
+            </p>
+          )}
+
+          {state.provider === "bird" && (
+            <p className="mt-3 text-sm text-zinc-400">
+              The user&apos;s Bird API key is attached. They can send from any address on their verified Bird sending
+              domain.
             </p>
           )}
 

@@ -62,11 +62,12 @@ export function providerFor(accessKey: {
   smtpPassword?: string | null;
   sesAccessKeyId?: string | null;
   sesSmtpPassword?: string | null;
-}): "postal-api" | "postal-smtp" | "devner" | "ses-api" | "ses-smtp" | "elasticemail" | "resend" | "mailgun" | "smtp" | "zeptomail" | "cloudflare" {
+}): "postal-api" | "postal-smtp" | "devner" | "ses-api" | "ses-smtp" | "elasticemail" | "resend" | "mailgun" | "smtp" | "zeptomail" | "cloudflare" | "bird" {
   if (accessKey.provider === "devner") return "devner";
   if (accessKey.provider === "elasticemail") return "elasticemail";
   if (accessKey.provider === "cloudflare") return "cloudflare";
   if (accessKey.provider === "resend") return "resend";
+  if (accessKey.provider === "bird") return "bird";
   if (accessKey.provider === "mailgun") return "mailgun";
   if (accessKey.provider === "zeptomail") return "zeptomail";
   if (accessKey.provider === "smtp" || accessKey.provider === "custom") return "smtp";

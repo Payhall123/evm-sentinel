@@ -6,6 +6,7 @@ import { sendViaDevner } from "@/lib/devner";
 import { sendViaSesApi, deriveSesSmtpPassword, sesSmtpHost } from "@/lib/ses";
 import { sendViaElasticEmail } from "@/lib/elasticemail";
 import { sendViaResend } from "@/lib/resend";
+import { sendViaBird } from "@/lib/bird";
 import { cloudflareCredentials, sendViaCloudflare } from "@/lib/cloudflare";
 import { ensureMailgunWebhooks, sendViaMailgun } from "@/lib/mailgun";
 import { sendViaSmtp, type SmtpAccount } from "@/lib/smtp";
@@ -172,6 +173,7 @@ async function dispatchCampaign(
   const isSes = accessKey.provider === "ses";
   const isElasticEmail = accessKey.provider === "elasticemail";
   const isResend = accessKey.provider === "resend";
+  const isBird = accessKey.provider === "bird";
   const isCloudflare = accessKey.provider === "cloudflare";
   const isMailgun = accessKey.provider === "mailgun";
   // Cloudflare Email Service sends over HTTP; per-key credentials fall back to
@@ -194,6 +196,7 @@ async function dispatchCampaign(
     !isSes &&
     !isElasticEmail &&
     !isResend &&
+    !isBird &&
     !isCloudflare &&
     !isMailgun &&
     !isCustomSmtp &&
@@ -257,8 +260,10 @@ async function dispatchCampaign(
       ? ""
       : isElasticEmail
         ? accessKey.elasticEmailApiKey || process.env.ELASTICEMAIL_API_KEY || ""
-        : isResend
+                  : isResend
           ? accessKey.resendApiKey || process.env.RESEND_API_KEY || ""
+          : isBird
+            ? accessKey.birdApiKey || process.env.BIRD_API_KEY || ""
           : isCloudflare
             ? ""
             : isMailgun
@@ -279,6 +284,8 @@ async function dispatchCampaign(
         ? Boolean(sendKey)
         : isResend
           ? Boolean(sendKey)
+          : isBird
+            ? Boolean(sendKey)
           : isCloudflare
             ? Boolean(cloudflare.accountId && cloudflare.apiToken)
             : isMailgun
@@ -302,6 +309,8 @@ async function dispatchCampaign(
               ? "Missing Elastic Email API key"
               : isResend
                 ? "Missing Resend API key"
+                : isBird
+                  ? "Missing Bird API key"
                 : isCloudflare
                   ? "Missing Cloudflare account ID or API token"
                   : isMailgun
@@ -499,6 +508,13 @@ async function dispatchCampaign(
                   fromName: campaign.fromName,
                   headers: unsubscribeHeaders,
                 })
+              : isBird
+                ? await sendViaBird(sendKey, {
+                    ...params,
+                    from: campaign.fromEmail,
+                    fromName: campaign.fromName,
+                    headers: unsubscribeHeaders,
+                  })
               : isCloudflare
                 ? await sendViaCloudflare(cloudflare, {
                     ...params,

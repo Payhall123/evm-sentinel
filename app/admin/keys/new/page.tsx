@@ -7,8 +7,8 @@ export default function NewAccessKeyPage() {
       <p className="mb-6 text-sm text-zinc-500">
         Provision a Postal mail server and domain automatically, attach an existing Postal SMTP mailbox, relay
         through Devner, add Amazon SES credentials, attach a user&apos;s Elastic Email, Resend or Mailgun API key,
-        set up Cloudflare Email Service (REST sending with optional Email Routing inbound), or connect ZeptoMail
-        (Zoho CPaaS) / custom SMTP credentials.
+        set up Cloudflare Email Service (REST sending with optional Email Routing inbound), connect ZeptoMail
+        (Zoho CPaaS) / custom SMTP credentials, or attach a Bird (MessageBird) API key.
       </p>
       <NewAccessKeyForm />
     </div>

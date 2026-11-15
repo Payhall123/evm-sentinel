@@ -28,6 +28,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
                   ? "Resend"
                   : accessKey.provider === "mailgun"
                     ? "Mailgun"
+                    : accessKey.provider === "bird"
+                      ? "Bird"
                     : accessKey.provider === "cloudflare"
                       ? "Cloudflare Email"
                       : accessKey.provider === "zeptomail"

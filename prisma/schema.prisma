@@ -50,6 +50,10 @@ model AccessKey {
   // every Resend API request; the key's sending domain must be verified in that
   // same Resend account.
   resendApiKey    String?
+  // Per-key Bird (MessageBird) API key (bk_{region}_...). Sent via the official
+  // @messagebird/sdk client; the region is inferred from the key prefix. The
+  // sending domain must be verified in the Bird workspace that owns the key.
+  birdApiKey      String?
   // Per-key Mailgun API key. Mailgun authenticates with HTTP Basic auth
   // ("api" + key) and sends through /v3/<domain>/messages. The access key's
   // `domain` is the Mailgun sending domain (a sandbox domain is valid), and

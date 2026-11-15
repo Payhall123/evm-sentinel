@@ -29,7 +29,7 @@ export default async function AdminKeysPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">Access keys</h1>
-          <p className="text-sm text-zinc-500">Create access keys, then provision a Postal domain, choose Devner, attach Amazon SES credentials, add an Elastic Email / Resend / Mailgun API key, set up Cloudflare Email Service (REST sending + optional Email Routing), configure ZeptoMail (Zoho CPaaS) SMTP, or configure custom SMTP (e.g., Spacemail).</p>
+          <p className="text-sm text-zinc-500">Create access keys, then provision a Postal domain, choose Devner, attach Amazon SES credentials, add an Elastic Email / Resend / Mailgun / Bird API key, set up Cloudflare Email Service (REST sending + optional Email Routing), configure ZeptoMail (Zoho CPaaS) SMTP, or configure custom SMTP (e.g., Spacemail).</p>
         </div>
         <Link href="/admin/keys/new" className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500">
           New access key
@@ -61,6 +61,8 @@ export default async function AdminKeysPage() {
                               ? "cyan"
                               : k.provider === "mailgun"
                                 ? "green"
+                                : k.provider === "bird"
+                                  ? "cyan"
                                 : k.provider === "zeptomail"
                                   ? "cyan"
                                   : k.provider === "cloudflare"
@@ -80,6 +82,8 @@ export default async function AdminKeysPage() {
                             ? "Resend"
                             : k.provider === "mailgun"
                               ? "Mailgun"
+                              : k.provider === "bird"
+                                ? "Bird"
                               : k.provider === "zeptomail"
                                 ? "ZeptoMail"
                                 : k.provider === "cloudflare"
@@ -147,6 +151,12 @@ export default async function AdminKeysPage() {
                 <p className="mt-3 text-xs text-zinc-600">
                   Resend API · sends from addresses @{k.domain}
                   {k.resendApiKey ? " · per-user API key" : " · shared server key (RESEND_API_KEY)"}
+                </p>
+              )}
+              {k.provider === "bird" && (
+                <p className="mt-3 text-xs text-zinc-600">
+                  Bird API · sends from addresses @{k.domain}
+                  {k.birdApiKey ? " · per-user API key" : " · shared server key (BIRD_API_KEY)"}
                 </p>
               )}
               {k.provider === "mailgun" && (

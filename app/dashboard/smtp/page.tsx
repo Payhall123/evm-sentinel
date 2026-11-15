@@ -41,6 +41,8 @@ export default async function SmtpSettingsPage() {
                       ? "Your account sends through Cloudflare Email Service's REST API — no SMTP — and can receive mail through Cloudflare Email Routing."
                       : accessKey.provider === "mailgun"
                         ? "Your account sends through the Mailgun HTTP API; EVM Sentinel manages the sends."
+                        : accessKey.provider === "bird"
+                          ? "Your account sends through the Bird HTTP API; EVM Sentinel manages the sends."
                         : "Send from your own tools using the Postal mailbox attached to your account."}
       </p>
 

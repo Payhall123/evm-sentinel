@@ -144,6 +144,7 @@ export async function createAccessKeyAction(_prev: AccessKeyFormState | undefine
     devnerApiKey: formData.get("devnerApiKey"),
     elasticEmailApiKey: formData.get("elasticEmailApiKey"),
     resendApiKey: formData.get("resendApiKey"),
+    birdApiKey: formData.get("birdApiKey"),
     mailgunApiKey: formData.get("mailgunApiKey"),
     mailgunApiBase: formData.get("mailgunApiBase"),
     sesRegion: formData.get("sesRegion"),
@@ -172,6 +173,7 @@ export async function createAccessKeyAction(_prev: AccessKeyFormState | undefine
     devnerApiKey,
     elasticEmailApiKey,
     resendApiKey,
+    birdApiKey,
     mailgunApiKey,
     mailgunApiBase,
   } = parsed.data;
@@ -341,6 +343,38 @@ export async function createAccessKeyAction(_prev: AccessKeyFormState | undefine
     revalidatePath("/admin/keys");
     revalidatePath("/admin");
     return { key, mode: "api", provider: "resend", mailbox: null };
+  }
+
+  // Bird (MessageBird): the user's own API key authenticates every send and the
+  // sending domain must already be verified in that Bird workspace. Like Resend
+  // no Postal resources are provisioned, so the key is usable immediately.
+  if (provider === "bird") {
+    if (!parsed.data.domain) {
+      return {
+        error: "A sending domain is required for a Bird key (it must be verified in that Bird workspace).",
+      };
+    }
+    if (!birdApiKey) {
+      return { error: "A Bird API key is required for this access key." };
+    }
+    const key = randomKey();
+    await prisma.accessKey.create({
+      data: {
+        key,
+        name,
+        email,
+        domain: parsed.data.domain,
+        provider: "bird",
+        sendMode: "api",
+        birdApiKey,
+        dailyLimit: parsed.data.dailyLimit ?? null,
+        expiresAt: parsed.data.expiresAt ?? null,
+        status: "active",
+      },
+    });
+    revalidatePath("/admin/keys");
+    revalidatePath("/admin");
+    return { key, mode: "api", provider: "bird", mailbox: null };
   }
 
   // Cloudflare Email Service: outbound mail goes through Cloudflare's REST API

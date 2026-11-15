@@ -17,7 +17,8 @@ export const accessKeyCreateSchema = z.object({
   // ZeptoMail (Zoho CPaaS) SMTP relay with its fixed host/port defaults.
   // "cloudflare" sends through Cloudflare Email Service's REST API and can
   // optionally receive mail through Cloudflare Email Routing — no SMTP at all.
-  provider: z.enum(["postal", "devner", "ses", "elasticemail", "resend", "mailgun", "smtp", "custom", "zeptomail", "cloudflare"]).default("postal"),
+  // "bird" sends through the Bird (MessageBird) Email API using a per-key API key.
+  provider: z.enum(["postal", "devner", "ses", "elasticemail", "resend", "mailgun", "smtp", "custom", "zeptomail", "cloudflare", "bird"]).default("postal"),
   // Optional per-key Devner API key (sl_...). When omitted, DEVNER_API_KEY is used.
   devnerApiKey: z
     .union([z.string().trim().max(500), z.null()])
@@ -33,6 +34,12 @@ export const accessKeyCreateSchema = z.object({
   // Stored on the access key so each user sends through their own Resend
   // account.
   resendApiKey: z
+    .union([z.string().trim().max(500), z.null()])
+    .transform((v) => (v === "" ? null : v))
+    .optional(),
+  // Per-key Bird (MessageBird) API key (bk_{region}_...). Sent via the official
+  // @messagebird/sdk client; the region is inferred from the key prefix.
+  birdApiKey: z
     .union([z.string().trim().max(500), z.null()])
     .transform((v) => (v === "" ? null : v))
     .optional(),
